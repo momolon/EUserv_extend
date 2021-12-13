@@ -1,49 +1,57 @@
+Skip to content
+Search or jump to…
+Pull requests
+Issues
+Marketplace
+Explore
+ 
+@momolon 
+xyfx666
+/
+EUserv_extend
+Public
+forked from o0oo0ooo0/EUserv_extend
+Code
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+EUserv_extend/main.py /
+@XmJwit
+XmJwit add task result Push source: CoolPush and PushPlus
+…
+Latest commit 1446d48 on 2 Feb
+ History
+ 2 contributors
+@o0oo0ooo0@XmJwit
+200 lines (179 sloc)  6.66 KB
+   
 # -*- coding: utf8 -*-
-import re
 import json
 import time
 import requests
-import base64
 from bs4 import BeautifulSoup
 
-
 # 强烈建议部署在非大陆区域，例如HK、SG等
-# 常量命名使用全部大写的方式，可以使用下划线。
-USERNAME = '13192520'  # 这里填用户名，邮箱也可
-PASSWORD = 'luo0hong'  # 这里填密码
 
-# TrueCaptcha https://apitruecaptcha.org
-# https://gist.github.com/ZetaoYang/e182453efadc90739a14daf2bd829087
-# 验证码识别，默认使用 Demo API，每天有100次免费额度，建议自行注册以确保稳定性
-TRUECAPTCHA_USERID = 'arun56'
-TRUECAPTCHA_APIKEY = 'wMjXmBIcHcdYqO2RrsVN'
-TRUECAPTCHA_CHECK_USAGE = True
+USERNAME = '' # 这里填用户名，邮箱也可
+PASSWORD = ''  # 这里填密码
 
 # Server酱 http://sc.ftqq.com/?c=code
-SCKEY = ''  # 这里填Server酱的key，无需推送可不填 示例: SCU646xxxxxxxxdacd6a5dc3f6
+SCKEY = '' # 这里填Server酱的key，无需推送可不填 示例: SCU646xxxxxxxxdacd6a5dc3f6
 
 # 酷推 https://cp.xuthus.cc
-COOL_PUSH_SKEY = ''
+CoolPush_Skey = ''
 # 通知类型 CoolPush_MODE的可选项有（默认send）：send[QQ私聊]、group[QQ群聊]、wx[个微]、ww[企微]
-COOL_PUSH_MODE = 'send'
+CoolPush_MODE = 'send'
 
 # PushPlus https://pushplus.hxtrip.com/message
-PUSH_PLUS_TOKEN = ''
+PushPlus_Token = ''
 
-# Telegram Bot Push https://core.telegram.org/bots/api#authorizing-your-bot
-TG_BOT_TOKEN = ''  # 通过 @BotFather 申请获得，示例：1077xxx4424:AAFjv0FcqxxxxxxgEMGfi22B4yh15R5uw
-TG_USER_ID = ''  # 用户、群组或频道 ID，示例：129xxx206
-TG_API_HOST = 'api.telegram.org'  # 自建 API 反代地址，供网络环境无法访问时使用，网络正常则保持默认
+desp = '' # 不用动
 
-# wecomchan https://github.com/easychen/wecomchan
-WECOMCHAN_DOMAIN = ''  # http(s)://example.com/
-WECOMCHAN_SEND_KEY = ''
-WECOMCHAN_TO_USER = '@all'  # 默认全部推送, 对个别人推送可用 User1|User2
-# 变量命名使用全部小写的方式，可以使用下划线。
-desp = ''  # 不用动
-
-
-# 函数命名使用全部小写的方式，可以使用下划线。
 def print_(info):
     print(info)
     global desp
@@ -55,103 +63,49 @@ def login(username, password) -> (str, requests.session):
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                       "Chrome/83.0.4103.116 Safari/537.36",
         "origin": "https://www.euserv.com",
+        "host": "support.euserv.com"
     }
-    url = "https://support.euserv.com/index.iphp"
-    captcha_image_url = "https://support.euserv.com/securimage_show.php"
-    session = requests.Session()
-
-    sess = session.get(url, headers=headers)
-    sess_id = re.findall("PHPSESSID=(\\w{10,100});", str(sess.headers))[0]
-    # 访问png
-    png_url = "https://support.euserv.com/pic/logo_small.png"
-    session.get(png_url, headers=headers)
-
     login_data = {
         "email": username,
         "password": password,
         "form_selected_language": "en",
         "Submit": "Login",
-        "subaction": "login",
-        "sess_id": sess_id
+        "subaction": "login"
     }
-    f = session.post(url, headers=headers, data=login_data)
+    url = "https://support.euserv.com/index.iphp"
+    session = requests.Session()
+    f = session.post(url, headers=headers, data=login_data, verify=False)
     f.raise_for_status()
-
-    if (
-        f.text.find("Hello") == -1
-        and f.text.find("Confirm or change your customer data here") == -1
-    ):
-        if (
-            f.text.find(
-                "To finish the login process please solve the following captcha."
-            )
-            == -1
-        ):
-            return "-1", session
-        else:
-            print_("[Captcha Solver] 进行验证码识别...")
-            solved_result = captcha_solver(captcha_image_url, session)
-            captcha_code = handle_captcha_solved_result(solved_result)
-            print_("[Captcha Solver] 识别的验证码是: {}".format(captcha_code))
-            if TRUECAPTCHA_CHECK_USAGE:
-                usage = get_captcha_solver_usage()
-                print_(
-                    "[Captcha Solver] current date {0} api usage count: {1}".format(
-                        usage[0]["date"], usage[0]["count"]
-                    )
-                )
-            f2 = session.post(
-                url,
-                headers=headers,
-                data={
-                    "subaction": "login",
-                    "sess_id": sess_id,
-                    "captcha_code": captcha_code,
-                },
-            )
-            if (
-                f2.text.find(
-                    "To finish the login process please solve the following captcha."
-                )
-                == -1
-            ):
-                print_("[Captcha Solver] 验证通过")
-                return sess_id, session
-            else:
-                print_("[Captcha Solver] 验证失败")
-                return "-1", session
-    else:
-        return sess_id, session
+    if f.text.find('Hello') == -1:
+        return '-1', session
+    # print_(f.request.url)
+    sess_id = f.request.url[f.request.url.index('=') + 1:len(f.request.url)]
+    return sess_id, session
 
 
-def get_servers(sess_id: str, session: requests.session) -> {}:
+def get_servers(sess_id, session) -> {}:
     d = {}
     url = "https://support.euserv.com/index.iphp?sess_id=" + sess_id
     headers = {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                       "Chrome/83.0.4103.116 Safari/537.36",
-        "origin": "https://www.euserv.com"
+        "origin": "https://www.euserv.com",
+        "host": "support.euserv.com"
     }
-    f = session.get(url=url, headers=headers)
+    f = session.get(url=url, headers=headers, verify=False)
     f.raise_for_status()
     soup = BeautifulSoup(f.text, 'html.parser')
     for tr in soup.select('#kc2_order_customer_orders_tab_content_1 .kc2_order_table.kc2_content_table tr'):
         server_id = tr.select('.td-z1-sp1-kc')
         if not len(server_id) == 1:
             continue
-        flag = (
-            True
-            if tr.select(".td-z1-sp2-kc .kc2_order_action_container")[0]
-            .get_text()
-            .find("Contract extension possible from")
-            == -1
-            else False
-        )
+        flag = True if tr.select('.td-z1-sp2-kc .kc2_order_action_container')[
+                           0].get_text().find('Contract extension possible from') == -1 else False
         d[server_id[0].get_text()] = flag
     return d
 
 
-def renew(sess_id: str, session: requests.session, password: str, order_id: str) -> bool:
+def renew(sess_id, session, password, order_id) -> bool:
     url = "https://support.euserv.com/index.iphp"
     headers = {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -167,14 +121,14 @@ def renew(sess_id: str, session: requests.session, password: str, order_id: str)
         "subaction": "choose_order",
         "choose_order_subaction": "show_contract_details"
     }
-    session.post(url, headers=headers, data=data)
+    session.post(url, headers=headers, data=data, verify=False)
     data = {
         "sess_id": sess_id,
         "subaction": "kc2_security_password_get_token",
         "prefix": "kc2_customer_contract_details_extend_contract_",
         "password": password
     }
-    f = session.post(url, headers=headers, data=data)
+    f = session.post(url, headers=headers, data=data, verify=False)
     f.raise_for_status()
     if not json.loads(f.text)["rs"] == "success":
         return False
@@ -185,13 +139,13 @@ def renew(sess_id: str, session: requests.session, password: str, order_id: str)
         "subaction": "kc2_customer_contract_details_extend_contract_term",
         "token": token
     }
-    session.post(url, headers=headers, data=data)
+    session.post(url, headers=headers, data=data, verify=False)
     time.sleep(5)
     return True
 
 
-def check(sess_id: str, session: requests.session):
-    print("Checking.......")
+def check(sess_id, session):
+    print_("Checking.......")
     d = get_servers(sess_id, session)
     flag = True
     for key, val in d.items():
@@ -200,72 +154,6 @@ def check(sess_id: str, session: requests.session):
             print_("ServerID: %s Renew Failed!" % key)
     if flag:
         print_("ALL Work Done! Enjoy")
-        
-
-# TrueCaptcha https://apitruecaptcha.org
-def captcha_solver(captcha_image_url: str, session: requests.session) -> dict:
-    response = session.get(captcha_image_url)
-    encoded_string = base64.b64encode(response.content)
-    url = "https://api.apitruecaptcha.org/one/gettext"
-
-    data = {
-        "userid": TRUECAPTCHA_USERID,
-        "apikey": TRUECAPTCHA_APIKEY,
-        "case": "mixed",
-        "mode": "human",
-        "data": str(encoded_string)[2:-1],
-    }
-    r = requests.post(url=url, json=data)
-    j = json.loads(r.text)
-    return j
-
-def handle_captcha_solved_result(solved: dict) -> str:
-    if "result" in solved:
-        solved_text = solved["result"]
-        if "RESULT  IS" in solved_text:
-            print_("[Captcha Solver] You are using the demo apikey.")
-            print("There is no guarantee that demo apikey will work in the future!")
-            # because using demo apikey
-            text = re.findall(r"RESULT  IS . (.*) .", solved_text)[0]
-        else:
-            # using your own apikey
-            print_("[Captcha Solver] You are using your own apikey.")
-            text = solved_text
-        operators = ["X", "x", "+", "-"]
-        if any(x in text for x in operators):
-            for operator in operators:
-                operator_pos = text.find(operator)
-                if operator == "x" or operator == "X":
-                    operator = "*"
-                if operator_pos != -1:
-                    left_part = text[:operator_pos]
-                    right_part = text[operator_pos + 1 :]
-                    if left_part.isdigit() and right_part.isdigit():
-                        return eval(
-                            "{left} {operator} {right}".format(
-                                left=left_part, operator=operator, right=right_part
-                            )
-                        )
-                    else:
-                        # Because these symbols("X", "x", "+", "-") do not appear at the same time,
-                        # it just contains an arithmetic symbol.
-                        return text
-        else:
-            return text
-    else:
-        print(solved)
-        raise KeyError("Failed to find parsed results.")
-
-def get_captcha_solver_usage() -> dict:
-    url = "https://api.apitruecaptcha.org/one/getusage"
-    params = {
-        "username": TRUECAPTCHA_USERID,
-        "apikey": TRUECAPTCHA_APIKEY,
-    }
-    r = requests.get(url=url, params=params)
-    j = json.loads(r.text)
-    return j
-
 
 # Server酱 http://sc.ftqq.com/?c=code
 def server_chan():
@@ -279,56 +167,30 @@ def server_chan():
     else:
         print('Server酱 推送成功')
 
-
 # 酷推 https://cp.xuthus.cc/
-def coolpush():
+def CoolPush():
     c = 'EUserv续费日志\n\n' + desp
     data = json.dumps({'c': c})
-    url = 'https://push.xuthus.cc/' + COOL_PUSH_MODE + '/' + COOL_PUSH_SKEY
+    url = 'https://push.xuthus.cc/' + CoolPush_MODE + '/' + CoolPush_Skey
     response = requests.post(url, data=data)
     if response.status_code != 200:
         print('酷推 推送失败')
     else:
         print('酷推 推送成功')
 
-
 # PushPlus https://pushplus.hxtrip.com/message
-def push_plus():
+def PushPlus():
     data = (
-        ('token', PUSH_PLUS_TOKEN),
+        ('token', PushPlus_Token),
         ('title', 'EUserv续费日志'),
         ('content', desp)
     )
-    url = 'https://pushplus.hxtrip.com/send'
+    url = 'http://pushplus.hxtrip.com/send'
     response = requests.post(url, data=data)
     if response.status_code != 200:
         print('PushPlus 推送失败')
     else:
         print('PushPlus 推送成功')
-
-
-# Telegram Bot Push https://core.telegram.org/bots/api#authorizing-your-bot
-def telegram():
-    data = (
-        ('chat_id', TG_USER_ID),
-        ('text', 'EUserv续费日志\n\n' + desp)
-    )
-    response = requests.post('https://' + TG_API_HOST + '/bot' + TG_BOT_TOKEN + '/sendMessage', data=data)
-    if response.status_code != 200:
-        print('Telegram Bot 推送失败')
-    else:
-        print('Telegram Bot 推送成功')
-
-
-# wecomchan https://github.com/easychen/wecomchan
-def wecomchan():
-    response = requests.get(WECOMCHAN_DOMAIN + 'wecomchan?sendkey=' + WECOMCHAN_SEND_KEY + '&msg_type=text' + '&to_user=' +
-                            WECOMCHAN_TO_USER + '&msg=' + 'EUserv续费日志\n\n' + desp)
-    if response.status_code != 200:
-        print('wecomchan 推送失败')
-    else:
-        print('wecomchan 推送成功')
-
 
 def main_handler(event, context):
     if not USERNAME or not PASSWORD:
@@ -346,9 +208,9 @@ def main_handler(event, context):
         if sessid == '-1':
             print_("第 %d 个账号登陆失败，请检查登录信息" % (i + 1))
             continue
-        servers = get_servers(sessid, s)
-        print_("检测到第 {} 个账号有 {} 台VPS，正在尝试续期".format(i + 1, len(servers)))
-        for k, v in servers.items():
+        SERVERS = get_servers(sessid, s)
+        print_("检测到第 {} 个账号有 {} 台VPS，正在尝试续期".format(i + 1, len(SERVERS)))
+        for k, v in SERVERS.items():
             if v:
                 if not renew(sessid, s, passwd_list[i], k):
                     print_("ServerID: %s Renew Error!" % k)
@@ -359,16 +221,23 @@ def main_handler(event, context):
         time.sleep(15)
         check(sessid, s)
         time.sleep(5)
-
-    # 五个通知渠道至少选取一个
+    
+    # 三个通知渠道至少选取一个
     SCKEY and server_chan()
-    COOL_PUSH_MODE and COOL_PUSH_SKEY and coolpush()
-    PUSH_PLUS_TOKEN and push_plus()
-    TG_BOT_TOKEN and TG_USER_ID and TG_API_HOST and telegram()
-    WECOMCHAN_DOMAIN and WECOMCHAN_SEND_KEY and WECOMCHAN_TO_USER and wecomchan()
-
+    CoolPush_MODE and CoolPush_Skey and CoolPush()
+    PushPlus_Token and PushPlus()
+    
     print('*' * 30)
-
-
-if __name__ == '__main__':  # 方便我本地调试
-    main_handler(None, None)
+© 2021 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
+Loading complete
